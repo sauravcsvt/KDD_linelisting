@@ -160,15 +160,14 @@ def infer_clinical(sent_start, sent_end, ll_sents, seed_kw):
 
 def main():
 
-    ll_articles = [json.loads(l) for l in io.open("./../data/geocoded_ll_KSA_artl.json", "r")]
+    ll_articles = [json.loads(l) for l in io.open(sys.argv[1], "r")]
     seed_keywords = {"Onset Date": "onset", 
                      "Hospital Date": "hospitalized", 
                      "Outcome Date": "died", 
                      "Specified Proximity to Animals or Animal Products": "animals", 
                      "Specified Contact with Other Cases": "case", 
                      "Specified HCW": "healthcare",
-                     "Specified Comorbidities": "comorbidities", 
-                     "Potentially Nosocomial": "hospital"}
+                     "Specified Comorbidities": "comorbidities"}
     auto_ll = []
     for ll_artl in ll_articles:
         ll_text = ""
@@ -219,25 +218,24 @@ def main():
             try:
                 for seed_key in seed_keywords:
                     num_cases[case_ind][seed_key] = defaultdict()
-                for K in [1]:
-                    num_cases[case_ind]["Onset Date"][K] = infer_onset(sent_start, sent_end, 
-                                                                       ll_sents, seed_keywords['Onset Date'], 
-                                                                       dt_dict)
-                    num_cases[case_ind]["Hospital Date"][K] = infer_onset(sent_start, sent_end, 
-                                                                          ll_sents, seed_keywords['Hospital Date'], 
-                                                                          dt_dict)
-                    num_cases[case_ind]["Outcome Date"][K] = infer_onset(sent_start, sent_end, 
-                                                                         ll_sents, seed_keywords['Outcome Date'], 
-                                                                         dt_dict)
-                    for clin_feat in ["Specified Proximity to Animals or Animal Products", "Specified Contact with Other Cases", 
-                                      "Specified HCW", "Specified Comorbidities", "Potentially Nosocomial"]:
-                        num_cases[case_ind][clin_feat][K] = infer_clinical(sent_start, sent_end, ll_sents, seed_keywords[clin_feat])
+                num_cases[case_ind]["Onset Date"] = infer_onset(sent_start, sent_end, 
+                                                                ll_sents, seed_keywords['Onset Date'], 
+                                                                dt_dict)
+                num_cases[case_ind]["Hospital Date"] = infer_onset(sent_start, sent_end, 
+                                                                   ll_sents, seed_keywords['Hospital Date'], 
+                                                                   dt_dict)
+                num_cases[case_ind]["Outcome Date"] = infer_onset(sent_start, sent_end, 
+                                                                  ll_sents, seed_keywords['Outcome Date'], 
+                                                                  dt_dict)
+                for clin_feat in ["Specified Proximity to Animals or Animal Products", "Specified Contact with Other Cases", 
+                                  "Specified HCW", "Specified Comorbidities", "Potentially Nosocomial"]:
+                    num_cases[case_ind][clin_feat] = infer_clinical(sent_start, sent_end, ll_sents, seed_keywords[clin_feat])
             except Exception:
                 continue
         if len(num_cases) != 0:
             auto_ll.extend(num_cases)
     if len(auto_ll) != 0:
-        with open(sys.argv[1] + "baseline_autoll.json", "w") as f_ll:
+        with open(sys.argv[2], "w") as f_ll:
             for cs in auto_ll:
                 print >> f_ll, json.dumps(cs, encoding='utf-8')
 

@@ -251,18 +251,18 @@ def main():
             try:
                 for seed_key in seed_keywords:
                     num_cases[case_ind][seed_key] = defaultdict()
-                num_cases[case_ind]["Onset Date"][K] = infer_onset(K, w2v_model, 
+                num_cases[case_ind]["Onset Date"] = infer_onset(K, w2v_model, 
                                                                    sent_start, sent_end, 
                                                                    ll_sents, seed_keywords['Onset Date'], dt_dict)['final']
-                num_cases[case_ind]["Hospital Date"][K] = infer_onset(K, w2v_model, 
+                num_cases[case_ind]["Hospital Date"] = infer_onset(K, w2v_model, 
                                                                       sent_start, sent_end, 
                                                                       ll_sents, seed_keywords['Hospital Date'], dt_dict)['final']
-                num_cases[case_ind]["Outcome Date"][K] = infer_onset(K, w2v_model, 
+                num_cases[case_ind]["Outcome Date"] = infer_onset(K, w2v_model, 
                                                                      sent_start, sent_end, 
                                                                      ll_sents, seed_keywords['Outcome Date'], dt_dict)['final']
                 for clin_feat in ["Specified Proximity to Animals or Animal Products", "Specified Contact with Other Cases", 
                                   "Specified HCW", "Specified Comorbidities", "Potentially Nosocomial"]:
-                    num_cases[case_ind][clin_feat][K] = infer_clinical(K, w2v_model, 
+                    num_cases[case_ind][clin_feat] = infer_clinical(K, w2v_model, 
                                                                        sent_start, sent_end, ll_sents, seed_keywords[clin_feat])['final']
             except Exception:
                 continue
