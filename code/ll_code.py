@@ -16,6 +16,7 @@ import sys
 import networkx as nx
 import numpy as np
 import nltk
+import argparse
 
 regex1 = re.compile(r'.*\s+(?P<age>\d{1,2})(.{0,20})(\s+|-)(?P<gender>woman|man|male|female|boy|girl|housewife).*')
 regex2 = re.compile(r'.*\s+(?P<age>\d{1,2})\s*years?(\s|-)old.*')
@@ -189,11 +190,26 @@ def infer_clinical(K, w2v_model, sent_start, sent_end, ll_sents, seed_kw):
     return {"final": final_forecast, "predictor": predictor_final}
 
 
+def parse_args():
+
+    ap = argparse.ArgumentParser("Automated line listing")
+
+    # Required Program Arguments
+    ap.add_argument("-i", "--MERSbulletins", type=str, required=True,
+                    help="Input file containing the WHO MERS bulletins from which line list will be extracted")
+    ap.add_argument("-v", "--whovec", type=str, required=True, 
+                    help="word vectors corresponding to the WHO corpus")
+    ap.add_argument("-ind", "--numind", type=str, required=True, help="Number of indicators to be used for extracting line list features")
+    ap.add_argument("-o", "--outputll", type=str, required=True, help="File where the automatically extracted line list will be dumped")
+    return ap.parse_args()
+
+
 def main():
 
-    ll_articles = [json.loads(l) for l in io.open(sys.argv[1], "r")]
-    w2v_model = Word2Vec.load(sys.argv[2])
-    K = np.int(sys.argv[3]) # Number of indicators (excluding the seed indicator)
+    _arg = parse_args()
+    ll_articles = [json.loads(l) for l in io.open(_arg.MERSbulletins, "r")]
+    w2v_model = Word2Vec.load(_arg.whovec)
+    K = np.int(_arg.numind) # Number of indicators (excluding the seed indicator)
     seed_keywords = {"Onset Date": "onset", 
                      "Hospital Date": "hospitalized", 
                      "Outcome Date": "died", 
@@ -269,7 +285,7 @@ def main():
         if len(num_cases) != 0:
             auto_ll.extend(num_cases)
     if len(auto_ll) != 0:
-        with open(sys.argv[4], "w") as f_ll:
+        with open(_arg.outputll, "w") as f_ll:
             for cs in auto_ll:
                 print >> f_ll, json.dumps(cs, encoding='utf-8')
 
