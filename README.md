@@ -1,8 +1,10 @@
 ## KDD_linelisting
-This repository contains the source codes and data for KDD line listing paper.
-The code for the proposed model 'Guided Deep List' is located at [linelist_code](./code/ll_code.py) 
-and the code for the baseline model 'Guidedlist' is located at
-[baseline_code](./code/ll_baseline.py). The codes can be executed as follows.
+This repository contains the source codes and data for the paper
+entitled ``Guided Deep List: Automating the Generation of Epidemiological Line
+Lists from Open Sources`` communicated to ACM SIGKDD 2017. The code for the proposed 
+model 'Guided Deep List' is located at [linelist_code](./code/ll_code.py) and the code 
+for the baseline model 'Guidedlist' is located at [baseline_code](./code/ll_baseline.py). 
+The codes can be executed as follows.
 
 Code: [linelist_code](./code/ll_code.py)
 usage: Automated line listing [-h] -i MERSBULLETINS -v WHOVEC -ind NUMIND -o
