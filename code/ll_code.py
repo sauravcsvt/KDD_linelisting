@@ -100,7 +100,6 @@ def infer_onset(K, w2v_model, sent_start, sent_end, ll_sents, seed_kw, dt_dict):
                 except Exception:
                     continue
         sent_start_iter += 1
-    #print predictor_dist
     predictor_forecast = {}
     for predictor in predictor_dist:
         predictor_forecast[predictor] = ""
@@ -113,7 +112,6 @@ def infer_onset(K, w2v_model, sent_start, sent_end, ll_sents, seed_kw, dt_dict):
             predictor_forecast[predictor] = min(predictor_dist[predictor].items(), key=lambda x: x[1])[0]
         if predictor_forecast[predictor] == "":
             predictor_forecast.pop(predictor)
-    #print predictor_forecast
     try:
         final_forecast = dt_dict[nltk.FreqDist(predictor_forecast.values()).max()]
     except Exception:
