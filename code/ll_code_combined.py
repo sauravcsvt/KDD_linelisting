@@ -64,8 +64,6 @@ def get_gender_value(x):
 def infer_onset(K, w2v_model, sent_start, sent_end, ll_sents, seed_kw, dt_dict):
     
     predictors = []
-    #print dt_dict
-    #print ll_sents[sent_start:sent_end + 1]
     predictor_dist = {}
     predictors.append(seed_kw)
     for similar_elm in w2v_model.most_similar(seed_kw, topn=20):
@@ -100,7 +98,6 @@ def infer_onset(K, w2v_model, sent_start, sent_end, ll_sents, seed_kw, dt_dict):
                 except Exception:
                     continue
         sent_start_iter += 1
-    #print predictor_dist
     predictor_forecast = {}
     for predictor in predictor_dist:
         predictor_forecast[predictor] = ""
@@ -113,7 +110,6 @@ def infer_onset(K, w2v_model, sent_start, sent_end, ll_sents, seed_kw, dt_dict):
             predictor_forecast[predictor] = min(predictor_dist[predictor].items(), key=lambda x: x[1])[0]
         if predictor_forecast[predictor] == "":
             predictor_forecast.pop(predictor)
-    #print predictor_forecast
     try:
         final_forecast = dt_dict[nltk.FreqDist(predictor_forecast.values()).max()]
     except Exception:
@@ -197,9 +193,10 @@ def parse_args():
     # Required Program Arguments
     ap.add_argument("-i", "--MERSbulletins", type=str, required=True,
                     help="Input file containing the WHO MERS bulletins from which line list will be extracted")
-    ap.add_argument("-v", "--whovec", type=str, required=True, 
-                    help="word vectors corresponding to the WHO corpus")
-    ap.add_argument("-ind", "--numind", type=str, required=True, help="Number of indicators to be used for extracting line list features")
+    ap.add_argument("-vSH", "--vecSH", type=str, required=True, help="SGHS word vectors corresponding to the WHO corpus")
+    ap.add_argument("-vSN", "--vecSN", type=str, required=True, help="SGNS word vectors corresponding to the WHO corpus")
+    ap.add_argument("-iSH", "--indSGHS", type=str, required=True, help="Number of indicators to be used for extracting line list features using SGHS")
+    ap.add_argument("-iSN", "--indSGNS", type=str, required=True, help="Number of indicators to be used for extracting line list features using SGNS")
     ap.add_argument("-o", "--outputll", type=str, required=True, help="File where the automatically extracted line list will be dumped")
     return ap.parse_args()
 
@@ -208,13 +205,15 @@ def main():
 
     _arg = parse_args()
     ll_articles = [json.loads(l) for l in io.open(_arg.MERSbulletins, "r")]
-    w2v_model = Word2Vec.load(_arg.whovec)
-    K = np.int(_arg.numind) # Number of indicators (excluding the seed indicator)
-    seed_keywords = {"Onset Date": "onset", 
-                     "Hospital Date": "hospitalized", 
-                     "Outcome Date": "died", 
-                     "Specified Proximity to Animals or Animal Products": "animals", 
-                     "Specified Contact with Other Cases": "case", 
+    w2v_SGHS = Word2Vec.load(_arg.vecSH)
+    w2v_SGNS = Word2Vec.load(_arg.vecSN)
+    K_SGHS = np.int(_arg.indSGHS)
+    K_SGNS = np.int(_arg.indSGNS)
+    seed_keywords = {"Onset Date": "onset",
+                     "Hospital Date": "hospitalized",
+                     "Outcome Date": "died",
+                     "Specified Proximity to Animals or Animal Products": "animals",
+                     "Specified Contact with Other Cases": "case",
                      "Specified HCW": "healthcare",
                      "Specified Comorbidities": "comorbidities"}
     auto_ll = []
@@ -224,7 +223,7 @@ def main():
         dt_dict = defaultdict()
         for dtphrase_elm in ll_artl['eventSemantics']['datetimes']:
             dt_dict["-".join(dtphrase_elm['phrase'].split())] = dtphrase_elm["date"]
-            dt_offsets.append({'start': ll_artl['BasisEnrichment']['tokens'][int(dtphrase_elm['offset'].split(":")[0])]['start'], 
+            dt_offsets.append({'start': ll_artl['BasisEnrichment']['tokens'][int(dtphrase_elm['offset'].split(":")[0])]['start'],
                                'end': ll_artl['BasisEnrichment']['tokens'][int(dtphrase_elm['offset'].split(":")[1]) - 1]['end']})
         for i in xrange(len(ll_artl["content"])):
             is_offset = 0
@@ -234,12 +233,12 @@ def main():
                     if ll_artl["content"][i] == " ":
                         ll_text += "-"
                     else:
-                        ll_text += ll_artl["content"][i] 
+                        ll_text += ll_artl["content"][i]
             if not is_offset:
                 if ll_artl["content"][i] == ".":
                     ll_text += " "
                 ll_text += ll_artl["content"][i]
-        num_cases = [] 
+        num_cases = []
         en_nlp = spacy.load('en')
         ll_doc = Doc(en_nlp.vocab)
         ll_doc = en_nlp(ll_text)
@@ -267,19 +266,22 @@ def main():
             try:
                 for seed_key in seed_keywords:
                     num_cases[case_ind][seed_key] = defaultdict()
-                num_cases[case_ind]["Onset Date"] = infer_onset(K, w2v_model, 
+                num_cases[case_ind]["Onset Date"] = infer_onset(K_SGNS, w2v_SGNS, 
+                                                                sent_start, sent_end, 
+                                                                ll_sents, seed_keywords['Onset Date'], dt_dict)['final']
+                num_cases[case_ind]["Hospital Date"] = infer_onset(K_SGHS, w2v_SGHS, 
                                                                    sent_start, sent_end, 
-                                                                   ll_sents, seed_keywords['Onset Date'], dt_dict)['final']
-                num_cases[case_ind]["Hospital Date"] = infer_onset(K, w2v_model, 
-                                                                      sent_start, sent_end, 
-                                                                      ll_sents, seed_keywords['Hospital Date'], dt_dict)['final']
-                num_cases[case_ind]["Outcome Date"] = infer_onset(K, w2v_model, 
-                                                                     sent_start, sent_end, 
-                                                                     ll_sents, seed_keywords['Outcome Date'], dt_dict)['final']
-                for clin_feat in ["Specified Proximity to Animals or Animal Products", "Specified Contact with Other Cases", 
-                                  "Specified HCW", "Specified Comorbidities"]:
-                    num_cases[case_ind][clin_feat] = infer_clinical(K, w2v_model, 
-                                                                       sent_start, sent_end, ll_sents, seed_keywords[clin_feat])['final']
+                                                                   ll_sents, seed_keywords['Hospital Date'], dt_dict)['final']
+                num_cases[case_ind]["Outcome Date"] = infer_onset(K_SGHS, w2v_SGHS, 
+                                                                  sent_start, sent_end, 
+                                                                  ll_sents, seed_keywords['Outcome Date'], dt_dict)['final']
+                for clin_feat in ["Specified Contact with Other Cases", "Specified HCW", "Specified Comorbidities"]:
+                    num_cases[case_ind][clin_feat] = infer_clinical(K_SGNS, w2v_SGNS, 
+                                                                    sent_start, sent_end, 
+                                                                    ll_sents, seed_keywords[clin_feat])['final']
+                num_cases[case_ind]["Specified Proximity to Animals or Animal Products"] = infer_clinical(K_SGHS, w2v_SGHS,
+                                                                                                          sent_start, sent_end,
+                                                                                                          ll_sents, seed_keywords["Specified Proximity to Animals or Animal Products"])['final']
             except Exception:
                 continue
         if len(num_cases) != 0:
