@@ -29,10 +29,10 @@ class LineList(object):
 
 
     def contains_digits(self, word):
-        return bool(_digits.search(word))
+        return bool(self._digits.search(word))
 
 
-    def get_age_gender(t):
+    def get_age_gender(self, t):
 
         m1 = self.regex1.match(t)
         if m1:
@@ -70,7 +70,7 @@ class LineList(object):
         predictor_dist = {}
         predictors.append(seed_kw)
         for similar_elm in w2v_model.most_similar(seed_kw, topn=20):
-            if len(similar_elm[0]) >= 3 and not contains_digits(similar_elm[0]):
+            if len(similar_elm[0]) >= 3 and not self.contains_digits(similar_elm[0]):
                 predictors.append(similar_elm[0])
             if len(predictors) == K + 1:
                 break
@@ -133,7 +133,7 @@ class LineList(object):
         predictor_forecast = defaultdict()
         predictors.append(seed_kw)
         for similar_elm in w2v_model.most_similar(seed_kw, topn=20):
-            if len(similar_elm[0]) >= 3 and not contains_digits(similar_elm[0]):
+            if len(similar_elm[0]) >= 3 and not self.contains_digits(similar_elm[0]):
                 predictors.append(similar_elm[0])
             if len(predictors) == K + 1:
                 break
@@ -152,7 +152,7 @@ class LineList(object):
                         # Direct Negation Detection
                         nd_neighbors = list(set(sent_dg.neighbors(nd)))
                         for neigh_elm in nd_neighbors:
-                            if neigh_elm.orth_ in negation_cues:
+                            if neigh_elm.orth_ in self.negation_cues:
                                 is_negation = 1
                         # Indirect Negation Detection
                         if not is_negation:
@@ -161,7 +161,7 @@ class LineList(object):
                                     if nx.shortest_path(sent_dg, nd_elm, nd):
                                         nd_elm_neighbors = list(set(sent_dg.neighbors(nd_elm)))
                                         for neigh_elm in nd_elm_neighbors:
-                                            if neigh_elm.orth_ in negation_cues:
+                                            if neigh_elm.orth_ in self.negation_cues:
                                                 is_negation = 1
                                 except Exception:
                                     continue
@@ -277,7 +277,8 @@ def main():
                     num_cases[case_ind][clin_feat] = ll_extract.infer_clinical(K, w2v_model, 
                                                                                sent_start, sent_end, 
                                                                                ll_sents, seed_keywords[clin_feat])['final']
-            except Exception:
+            except Exception as e:
+		print e
                 continue
         if len(num_cases) != 0:
             auto_ll.extend(num_cases)
