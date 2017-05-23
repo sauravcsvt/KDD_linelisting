@@ -19,8 +19,8 @@ optional arguments:
   -v WHOVEC, --whovec WHOVEC
                         word vectors corresponding to the WHO corpus
   -ind NUMIND, --numind NUMIND
-                        Number of indicators to be used for extracting line
-                        list features
+                        Number of predictors to be used for extracting line
+                        each list feature
   -o OUTPUTLL, --outputll OUTPUTLL
                         File where the automatically extracted line list will
                         be dumped

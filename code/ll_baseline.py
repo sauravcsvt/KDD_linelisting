@@ -20,67 +20,82 @@ import argparse
 
 
 class LineList(object):
+    '''
+    Creating a line list class for extracting line list features corresponding to each infected case
+    '''
     def __init__(self):
+
+        # Regular expressions to be used for extracting age and gender
+        # information for each infected case 
         self.regex1 = re.compile(r'.*\s+(?P<age>\d{1,2})(.{0,20})(\s+|-)(?P<gender>woman|man|male|female|boy|girl|housewife).*')
         self.regex2 = re.compile(r'.*\s+(?P<age>\d{1,2})\s*years?(\s|-)old.*')
         self.regex3 = re.compile(r'.*\s*(?P<gender>woman|man|male|female|boy|girl|housewife|he|she).*')
+        # Negation cues to be used for extracting clinical features
         self.negation_cues = ["no", "not", "none", "cannot", "without", "lack", "absence"]
+        # Creating a regular expression object to check whether a predictor
+        # keyword contains a digit or not
         self._digits = re.compile('\d')
 
 
+    # Function to check whether a predicor keyword contains a digit or not
     def contains_digits(self, word):
         return bool(self._digits.search(word))
 
+    # Function to extract age and gender for each infected case using a
+    # hierarchy of regular expressions
+    def get_age_gender(self, sent):
 
-    def get_age_gender(self, t):
-
-        m1 = self.regex1.match(t)
+        m1 = self.regex1.match(sent)
         if m1:
             age = int(m1.groupdict()['age'])
             gender = m1.groupdict()['gender']
         else:
-            m2 = self.regex2.match(t)
+            m2 = self.regex2.match(sent)
             if m2:
                 age = int(m2.groupdict()['age'])
             else:
                 age = None
 
-            m3 = self.regex3.match(t)
+            m3 = self.regex3.match(sent)
             if m3:
                 gender = m3.groupdict()['gender']
             else:
                 gender = None
         return {'age': age, 'gender': self.get_gender_value(gender)}
 
+    # Function to convert gender expression, such as 'man' and 'woman' to
+    # binary outcomes, such as 'M' or 'F'
+    def get_gender_value(self, gender):
 
-    def get_gender_value(self, x):
-
-        if x:
-            x = x.strip(r'\s*|-')
-            if x in ['man', 'male', 'boy', 'he']:
+        if gender:
+            gender = gender.strip(r'\s*|-')
+            if gender in ['man', 'male', 'boy', 'he']:
                 return 'M'
-            elif x in ['woman', 'female', 'girl', 'housewife', 'she']:
+            elif gender in ['woman', 'female', 'girl', 'housewife', 'she']:
                 return 'F'
         return None
 
-
-    def infer_date(self, sent_start, sent_end, ll_sents, seed_kw, dt_dict):
+    # Function to infer disease onset features for each infected case
+    def infer_date(self, **kwargs):
 
         predictors = []
         predictor_dist = {}
-        predictors.append(seed_kw)
+        # Only the seed predictor used for extracting the disease onset feature
+        predictors.append(kwargs['seed'])
         for predictor in predictors:
             predictor_dist[predictor] = {}
-            for dt_str in dt_dict:
+            for dt_str in kwargs['dt_dict']:
                 predictor_dist[predictor][dt_str] = []
-        sent_start_iter = sent_start
-        while sent_start_iter <= sent_end:
+        sent_start_iter = kwargs['start']
+        # Iterating over each sentence and calculating the undirected
+        # dependency distance from the seed predictor to a date phrase
+        while sent_start_iter <= kwargs['end']:
             sent_dg = nx.Graph()
-            for token in ll_sents[sent_start_iter]:
+            for token in kwargs['ll_sents'][sent_start_iter]:
                 if token.head.orth_ != token.orth_:
                     sent_dg.add_edge(token.head, token)
             for predictor in predictor_dist:
-                for dt_str in dt_dict:
+                for dt_str in kwargs['dt_dict']:
                     is_pred = 0
                     is_dt = 0
                     try:
@@ -92,14 +107,19 @@ class LineList(object):
                                 dt_obj = nd
                                 is_dt = 1
                         if is_pred and is_dt:
+                            # Calculating undirected dependency distance along
+                            # the shortest path from seed predictor to a date
+                            # phrase
                             predictor_dist[predictor][dt_str].append(nx.shortest_path_length(sent_dg, pred_obj, dt_obj)) #Calculatine dependency distance along the shortest path
                     except Exception:
                         continue
             sent_start_iter += 1
         predictor_forecast = {}
+        # Identifying the date phrase located at the shortest dependency
+        # distance from the seed predictor 
         for predictor in predictor_dist:
             predictor_forecast[predictor] = ""
-            for dt_str in dt_dict:
+            for dt_str in kwargs['dt_dict']:
                 if len(predictor_dist[predictor][dt_str]) == 0:
                     predictor_dist[predictor].pop(dt_str)
                 else:
@@ -109,35 +129,38 @@ class LineList(object):
             if predictor_forecast[predictor] == "":
                 predictor_forecast.pop(predictor)
         try:
-            final_forecast = dt_dict[nltk.FreqDist(predictor_forecast.values()).max()]
+            final_forecast = kwargs['dt_dict'][nltk.FreqDist(predictor_forecast.values()).max()]
         except Exception:
             final_forecast = None
         return final_forecast
 
 
-    def infer_clinical(self, sent_start, sent_end, ll_sents, seed_kw):
+    # Function to extract clinical features from each infected case
+    def infer_clinical(self, **kwargs):
 
         predictors = []
         predictor_forecast = defaultdict()
-        predictors.append(seed_kw)
+        # Only the seed predictor used for extracting the clinical feature 
+        predictors.append(kwargs['seed'])
+        # Extracting the output ('Y' or 'N') of the seed predictor
         for predictor in predictors:
-            sent_start_iter = sent_start
-            while sent_start_iter <= sent_end:
+            sent_start_iter = kwargs['start']
+            while sent_start_iter <= kwargs['end']:
                 is_detect = 0
                 sent_dg = nx.DiGraph()
-                for token in ll_sents[sent_start_iter]:
+                for token in kwargs['ll_sents'][sent_start_iter]:
                     if token.head.orth_ != token.orth_:
                         sent_dg.add_edges_from([(token.head, token)])
                 for nd in sent_dg.nodes():
                     if nd.orth_ == predictor:
                         is_detect = 1
                         is_negation = 0
-                        # Direct Negation Detection
+                        # Perform Direct Negation Detection
                         nd_neighbors = list(set(sent_dg.neighbors(nd)))
                         for neigh_elm in nd_neighbors:
                             if neigh_elm.orth_ in self.negation_cues:
                                 is_negation = 1
-                        # Indirect Negation Detection
+                        # If no direct negation, perform Indirect Negation Detection
                         if not is_negation:
                             for nd_elm in sent_dg.nodes():
                                 try:
@@ -166,6 +189,9 @@ class LineList(object):
 
 
 def parse_args():
+    '''
+    Reads the command line options and parses the appropriate commands
+    '''
 
     ap = argparse.ArgumentParser("Automated line listing")
 
@@ -179,7 +205,10 @@ def parse_args():
 def main():
 
     _arg = parse_args()
+    # list of articles from which line list features are to be extracted for
+    # each infected case
     ll_articles = [json.loads(l) for l in io.open(_arg.MERSbulletins, "r")]
+    # seed keywords for each line list feature guiding the extraction process
     seed_keywords = {"Onset Date": "onset", 
                      "Hospital Date": "hospitalized", 
                      "Outcome Date": "died", 
@@ -189,10 +218,13 @@ def main():
                      "Specified Comorbidities": "comorbidities"}
     auto_ll = []
     ll_extract = LineList()
+    # Extracting the number of infected cases and the line list features
+    # corresponding to each case from each article
     for ll_artl in ll_articles:
         ll_text = ""
         dt_offsets = []
         dt_dict = defaultdict()
+        # dt_dict: mapping date phrases to proper datetime strings, e.g.
         for dtphrase_elm in ll_artl['eventSemantics']['datetimes']:
             dt_dict["-".join(dtphrase_elm['phrase'].split())] = dtphrase_elm["date"]
             dt_offsets.append({'start': ll_artl['BasisEnrichment']['tokens'][int(dtphrase_elm['offset'].split(":")[0])]['start'], 
@@ -217,6 +249,8 @@ def main():
         ll_sents = []
         for sent in ll_doc.sents:
             ll_sents.append(sent)
+        # Extracting the number of cases mentioned in the article
+        # using age and gender information
         for sent_ind in xrange(len(ll_sents)):
             ag_out = ll_extract.get_age_gender(ll_sents[sent_ind].text)
             if ag_out['age'] is not None and ag_out['gender'] is not None:
@@ -226,6 +260,7 @@ def main():
                 case_feature['start'] = sent_ind
                 case_feature['link'] = ll_artl["link"]
                 num_cases.append(case_feature)
+        # Identifying the start sentence and end sentence for each case
         for case_ind in xrange(len(num_cases)):
             sent_start = num_cases[case_ind]['start']
             sent_end = sent_start + 2
@@ -238,19 +273,23 @@ def main():
             try:
                 for seed_key in seed_keywords:
                     num_cases[case_ind][seed_key] = defaultdict()
+                # Extracting the disease onset features for each infected case
                 for dt_feat in ["Onset Date", "Hospital Date", "Outcome Date"]:
-                    num_cases[case_ind][dt_feat] = ll_extract.infer_date(sent_start, sent_end, 
-                                                                         ll_sents, seed_keywords[dt_feat], dt_dict)
+                    kwargs = {'start': sent_start, 'end': sent_end, 'll_sents': ll_sents,
+                              'seed': seed_keywords[dt_feat], 'dt_dict': dt_dict}
+                    num_cases[case_ind][dt_feat] = ll_extract.infer_date(**kwargs)
+                # Extracting the clinical features corresponding to each case
                 for clin_feat in ["Specified Proximity to Animals or Animal Products", 
                                   "Specified Contact with Other Cases", 
                                   "Specified HCW", "Specified Comorbidities"]:
-                    num_cases[case_ind][clin_feat] = ll_extract.infer_clinical(sent_start, sent_end, 
-                                                                               ll_sents, seed_keywords[clin_feat])
+                    kwargs = {'start': sent_start, 'end': sent_end, 'll_sents': ll_sents,
+                              'seed': seed_keywords[clin_feat]}
+                    num_cases[case_ind][clin_feat] = ll_extract.infer_clinical(**kwargs)
             except Exception as e:
-		print e
-                continue
+		        print e
         if len(num_cases) != 0:
             auto_ll.extend(num_cases)
+    # Writing the automatically extracted line lists to a file
     if len(auto_ll) != 0:
         with open(_arg.outputll, "w") as f_ll:
             for cs in auto_ll:
